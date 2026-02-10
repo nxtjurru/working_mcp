@@ -87,17 +87,44 @@ CHECK_LOCAL_DATA_DESCRIPTION = (
     "- User asks about ANY topic -> CALL THIS FIRST (check docs, then fall back)\n"
 )
 
+SAVE_DATA_DESCRIPTION = (
+    "Use this tool to SAVE or STORE information that the user provides into "
+    "trial_document.txt. You MUST call this tool whenever the user asks you to "
+    "save, store, remember, record, add, or write down any information.\n\n"
+    "The data MUST be formatted as tab-separated key-value pairs, one per line, "
+    "matching the existing format in trial_document.txt:\n"
+    "  Name\tFull Name\n"
+    "  Address\tFull Address\n"
+    "  Contact\tPhone Number\n"
+    "  Email\tEmail Address\n"
+    "  Job\tJob Title\n"
+    "  Income\tIncome Details\n\n"
+    "You may include any relevant fields — not just the ones listed above. "
+    "Omit fields the user did not provide rather than guessing.\n\n"
+    "WHEN TO USE:\n"
+    "- User says 'save this', 'store this', 'remember this', 'add this', "
+    "'write this down', 'note this' -> CALL THIS TOOL\n"
+    "- User provides personal details and asks you to keep them -> CALL THIS TOOL\n"
+    "- User says 'update the document' or 'add to the file' -> CALL THIS TOOL\n"
+)
+
 
 # ── Create MCP server ──────────────────────────────────────────────────────
 
 mcp = FastMCP(
-    "Document Reader MCP",
+    "Document Reader & Writer MCP",
     instructions=(
-        "MANDATORY RULE — FOLLOW THIS FOR EVERY SINGLE USER MESSAGE:\n"
-        "Step 1: ALWAYS call the tool 'check_local_data' FIRST, before doing anything else.\n"
-        "Step 2: Read the results from 'check_local_data'.\n"
-        "Step 3: If the results contain relevant information, use THAT to answer the user.\n"
-        "Step 4: ONLY if 'check_local_data' returns nothing useful may you use your own knowledge.\n"
+        "MANDATORY RULES — FOLLOW THESE FOR EVERY SINGLE USER MESSAGE:\n\n"
+        "RULE 1 — READING: ALWAYS call the tool 'check_local_data' FIRST, before doing "
+        "anything else, to search locally stored personal records.\n"
+        "RULE 2 — WRITING: When the user asks you to save, store, remember, record, add, "
+        "or write down ANY information, you MUST call the 'save_to_document' tool. "
+        "Format the data as tab-separated key-value pairs matching trial_document.txt.\n\n"
+        "Step 1: ALWAYS call 'check_local_data' FIRST.\n"
+        "Step 2: Read the results.\n"
+        "Step 3: If the user wants to SAVE information, call 'save_to_document'.\n"
+        "Step 4: If the results contain relevant information, use THAT to answer.\n"
+        "Step 5: ONLY if no local data is found may you use your own knowledge.\n"
         "\n"
         "This server contains personal records, contact information, names, addresses, "
         "emails, phone numbers, job titles, income details, and other critical data. "
@@ -193,6 +220,49 @@ def search_document(filename: str, query: str) -> str:
     lines = content.splitlines()
     matches = [line for line in lines if query.lower() in line.lower()]
     return "\n".join(matches[:10]) if matches else "No relevant content found."
+
+
+# ── SAVE TOOL — write structured data to trial_document.txt ────────────────
+
+@mcp.tool(description=SAVE_DATA_DESCRIPTION)
+def save_to_document(data: str) -> str:
+    """Save structured information to trial_document.txt.
+
+    Args:
+        data: Tab-separated key-value pairs, one per line.
+              Example:
+                  Name\tJohn Doe
+                  Address\t123 Main Street, City
+                  Contact\t+91-9876543210
+                  Email\tjohn@email.com
+                  Job\tEngineer
+                  Income\t₹10,00,000 / year
+    """
+    file_path = DOCS_DIR / "trial_document.txt"
+
+    if not data or not data.strip():
+        return "❌ No data provided. Please provide information to save."
+
+    try:
+        existing = ""
+        if file_path.exists():
+            existing = file_path.read_text(encoding="utf-8")
+
+        # Ensure a blank-line separator between records
+        if existing.strip():
+            new_content = existing.rstrip("\n") + "\n\n" + data.strip() + "\n"
+        else:
+            new_content = data.strip() + "\n"
+
+        file_path.write_text(new_content, encoding="utf-8")
+        return f"✅ Data saved successfully to {file_path.name}."
+    except PermissionError:
+        return "❌ Permission denied: cannot write to trial_document.txt."
+    except OSError as e:
+        return f"❌ File system error while saving: {e}"
+    except Exception as e:
+        return f"❌ Unexpected error while saving: {e}"
+
 
 @mcp.tool()
 def capture_camera_image(camera_index: int = 0) -> Image:

@@ -19,3 +19,5 @@ Email	rahul.mehta@email.com
 Job	Marketing Manager
 Income	₹8,20,000 / year
 
+Name	Rajesh Patel
+Address	Ayodhya Bypass Road
